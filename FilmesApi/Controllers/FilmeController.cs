@@ -1,4 +1,8 @@
-﻿using FilmesApi.Models;
+﻿using AutoMapper;
+using FilmesApi.Data;
+using FilmesApi.Data.Dtos;
+using FilmesApi.Models;
+using Microsoft.AspNetCore.JsonPatch;
 using Microsoft.AspNetCore.Mvc;
 
 namespace FilmesApi.Controllers;
@@ -7,49 +11,40 @@ namespace FilmesApi.Controllers;
 [Route("[controller]")]
 public class FilmeController : ControllerBase
 {
+    //declarando injeção de dependencia
+    private FilmeContext _context;
+    private IMapper _mapper;
 
-    private static List<Filme> filmes = new List<Filme>();
-    private static int id = 0;
-
-    //[HttpPost]
-    //public void AdicionaFilme([FromBody] Filme filme)
-    //{
-    //    filme.Id = id++;
-    //    filmes.Add(filme);
-    //    //confirmando se esta recebendo os parametros
-    //    Console.WriteLine(filme.Titulo);
-    //    Console.WriteLine(filme.Duracao);
-    //}
-    [HttpPost]
-    public IActionResult AdicionaFilme([FromBody] Filme filme)
+    //criando construtor com a injeção de dependencia com argumento
+    public FilmeController(FilmeContext context, IMapper mapper)
     {
-        filme.Id = id++;
-        filmes.Add(filme);
-        //confirmando se esta recebendo os parametros
-        //Console.WriteLine(filme.Titulo);
-        //Console.WriteLine(filme.Duracao);
+        _context = context;
+        _mapper = mapper;
+    }
+
+    [HttpPost]
+    public IActionResult AdicionaFilme([FromBody] CreateFilmeDto filmeDto)
+    {
+        Filme filme = _mapper.Map<Filme>(filmeDto);
+        _context.Filmes.Add(filme);
+        //precisamos confirmar que essas informações forao salvas
+        _context.SaveChanges();
+
         return CreatedAtAction(nameof(RecuperaFilmePorId), new { id = filme.Id }, filme);
     }
 
     [HttpGet]
-    //public List<Filme> RetornarFilmes()
-    //{
-    //    return filmes;
-    //}
+
     public IEnumerable<Filme> RetornarFilmes([FromQuery] int skip = 0, [FromQuery] int take = 50)
     {
-        return filmes.Skip(skip).Take(take);
+        return _context.Filmes.Skip(skip).Take(take);
     }
 
     [HttpGet("{id}")]
-    //public Filme? RecuperaFilmePorId(int id)
-    //{
-    //    return filmes.FirstOrDefault(f => f.Id == id);
 
-    //}
     public IActionResult RecuperaFilmePorId(int id)
     {
-        var filme = filmes.FirstOrDefault(f => f.Id == id);
+        var filme = _context.Filmes.FirstOrDefault(f => f.Id == id);
         if (filme == null)
         {
             return NotFound();
@@ -58,5 +53,35 @@ public class FilmeController : ControllerBase
         {
             return Ok(filme);
         }
+    }
+
+    [HttpPut("{id}")]
+    public IActionResult AtualizaFilme(int id, [FromBody] UpdateFilmeDto filmeDto)
+    {
+        var filme = _context.Filmes.FirstOrDefault(filme => filme.Id == id);
+        if(filme == null) return NotFound();
+        _mapper.Map(filmeDto, filme);
+        _context.SaveChanges();
+        //para atualização retornamos nocontent
+        return NoContent();
+    }
+
+    [HttpPatch("{id}")]
+    public IActionResult AtualizaFilmeParcial(int id, JsonPatchDocument<UpdateFilmeDto> path)
+    {
+        var filme = _context.Filmes.FirstOrDefault(filme => filme.Id == id);
+        if (filme == null) return NotFound();
+
+        var filmeParaAtualizar = _mapper.Map<UpdateFilmeDto>(filme);
+        path.ApplyTo(filmeParaAtualizar, ModelState);
+        if (!TryValidateModel(filmeParaAtualizar))
+        {
+            return ValidationProblem(ModelState);
+        }
+
+        _mapper.Map(filmeParaAtualizar, filme);
+        _context.SaveChanges();
+        //para atualização retornamos nocontent
+        return NoContent();
     }
 }

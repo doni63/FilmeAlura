@@ -11,5 +11,5 @@ public class FilmeContext : DbContext
         
     }
     //propriedade de acesso aos dados do banco de dados
-    public DbSet<Filme> Filme { get; set; }
+    public DbSet<Filme> Filmes { get; set; }
 }
